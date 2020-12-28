@@ -560,6 +560,14 @@ type
 
   TKMemoLineSpacingMode = (lsmFactor, lsmValue);
 
+  TKMemoTabKind = (rpkLeft, rpkRight, rpkCenter, rpkDecimal);
+
+  PTabDef=^TTabDef;
+  TTabDef=record
+    TabKind: TKMemoTabKind;
+    Position: Integer; // Tab position in twips from the left margin
+  end;
+
   TKMemoParaStyle = class(TKMemoBlockStyle)
   private
     FFirstIndent: Integer;
@@ -570,6 +578,8 @@ type
     FNumberingListLevel: Integer;
     FNumberStartAt: Integer;
     FWordWrap: Boolean;
+    FTabKind : TKMemoTabKind;
+    FTabPosList: TList;
     procedure SetFirstIndent(const Value: Integer);
     procedure SetLineSpacingFactor(const Value: Double);
     procedure SetLineSpacingMode(const Value: TKMemoLineSpacingMode);
@@ -578,7 +588,17 @@ type
     procedure SetNumberingListLevel(const Value: Integer);
     procedure SetNumberStartAt(const Value: Integer);
     procedure SetWordWrap(const Value: Boolean);
+    procedure SetTabKind(const Value: TKMemoTabKind);
+    function  GetTabPosCount: Integer;
+    function  GetTabPosList(const Index: Integer): PTabDef;
+    procedure SetTabPosList(const Index: Integer; const Item: PTabDef);
   public
+    constructor Create; override;
+    destructor Destroy; override;
+    function AddTabPos(const Item: PTabDef): Integer;
+    procedure ClearTabPos;
+    procedure DeleteTabPos(Index: Integer);
+
     procedure Assign(ASource: TPersistent); override;
     procedure Defaults; override;
     procedure SetNumberingListAndLevel(AListID, ALevelIndex: Integer); virtual;
@@ -590,6 +610,9 @@ type
     property NumberingListLevel: Integer read FNumberingListLevel write SetNumberingListLevel;
     property NumberStartAt: Integer read FNumberStartAt write SetNumberStartAt;
     property WordWrap: Boolean read FWordWrap write SetWordWrap;
+    property TabKind: TKMemoTabKind read FTabKind write SetTabKind;
+    property TabPosCount: Integer read GetTabPosCount;
+    property TabPosList[Index: Integer]: PTabDef read GetTabPosList write SetTabPosList;
   end;
 
   { This class represents one line in the memo. }
@@ -3784,9 +3807,60 @@ begin
   FNumberingListLevel := -1;
   FNumberStartAt := 0;
   FWordWrap := True;
+  FTabKind := rpkLeft;
+  if (FTabPosList <> nil) then
+     ClearTabPos;
+end;
+
+constructor TKMemoParaStyle.Create;
+begin
+  inherited Create;
+  FTabPosList := TList.Create;
+end;
+
+destructor TKMemoParaStyle.Destroy;
+var
+   i: integer;
+begin
+  for i:= 0 to GetTabPosCount - 1 do
+     FreeMem(TabPosList[i]);
+  FTabPosList.Free;
+  inherited Destroy;
+end;
+
+function TKMemoParaStyle.GetTabPosCount: Integer;
+begin
+  Result := FTabPosList.Count;
+end;
+
+function TKMemoParaStyle.GetTabPosList(const Index: Integer): PTabDef;
+begin
+  Result := PTabDef(FTabPosList[Index]);
+end;
+
+procedure TKMemoParaStyle.SetTabPosList(const Index: Integer; const Item: PTabDef);
+begin
+  FTabPosList[Index] := Item;
+end;
+
+function TKMemoParaStyle.AddTabPos(const Item: PTabDef): Integer;
+begin
+  Result := FTabPosList.Add(Item);
+end;
+
+procedure TKMemoParaStyle.ClearTabPos;
+begin
+  FTabPosList.Clear;
+end;
+
+procedure TKMemoParaStyle.DeleteTabPos(Index: Integer);
+begin
+  FTabPosList.Delete(Index);
 end;
 
 procedure TKMemoParaStyle.Assign(ASource: TPersistent);
+var
+  i, count: integer;
 begin
   inherited;
   if ASource is TKMemoParaStyle then
@@ -3799,6 +3873,12 @@ begin
     NumberingList := TKMemoParaStyle(ASource).NumberingList;
     NumberStartAt := TKMemoParaStyle(ASource).NumberStartAt;
     WordWrap := TKMemoParaStyle(ASource).WordWrap;
+    TabKind := TKMemoParaStyle(ASource).TabKind;
+    count := TKMemoParaStyle(ASource).GetTabPosCount;
+    ClearTabPos;
+    FTabPosList.Capacity := TKMemoParaStyle(ASource).GetTabPosCount;
+    for i:= 0 to count - 1 do
+       AddTabPos(TKMemoParaStyle(ASource).TabPosList[i]);
   end;
 end;
 
@@ -3885,6 +3965,16 @@ begin
   begin
     FWordWrap := Value;
     PropsChanged([muExtent]);
+  end;
+end;
+
+
+procedure TKMemoParaStyle.SetTabKind(const Value: TKMemoTabKind);
+begin
+  if Value <> FTabKind then
+  begin
+    FTabKind := Value;
+    //PropsChanged([muExtent]);
   end;
 end;
 
@@ -14744,4 +14834,3 @@ begin
 end;
 
 end.
-
