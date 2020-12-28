@@ -247,7 +247,7 @@ type
     rplLevelFontIndex, rplLevelFirstIndent, rplLevelLeftIndent, rplPnText);
   TKMemoRTFParaProp = (rppParD, rppIndentFirst, rppIndentBottom, rppIndentLeft, rppIndentRight, rppIndentTop, rppAlignLeft, rppAlignCenter, rppAlignRight, rppAlignJustify,
     rppBackColor, rppNoWordWrap, rppBorderBottom, rppBorderLeft, rppBorderRight, rppBorderTop, rppBorderAll, rppBorderWidth, rppBorderNone, rppBorderRadius, rppBorderColor,
-    rppLineSpacing, rppLineSpacingMode, rppPar, rppListIndex, rppListLevel, rppListStartAt);
+    rppLineSpacing, rppLineSpacingMode, rppPar, rppListIndex, rppListLevel, rppListStartAt, rppTabKindC, rppTabKindR, rppTabKindDec,rppTabPos);
   TKMemoRTFShapeProp = (rpsShape, rpsBottom, rpsLeft, rpsRight, rpsTop, rpsXColumn, rpsYPara, rpsWrap, rpsWrapSide, rpsSn, rpsSv, rpsShapeText);
   TKMemoRTFSpecialCharProp = (rpscTab, rpscLquote, rpscRQuote, rpscLDblQuote, rpscRDblQuote, rpscEnDash, rpscEmDash, rpscBullet, rpscNBSP, rpscEmSpace, rpscEnSpace,
     rpscAnsiChar, rpscUnicodeChar);
@@ -1501,6 +1501,10 @@ begin
   FCtrlTable.AddCtrl('ls', Integer(rppListIndex), ReadParaFormatting);
   FCtrlTable.AddCtrl('ilvl', Integer(rppListLevel), ReadParaFormatting);
   FCtrlTable.AddCtrl('lsstartat', Integer(rppListStartAt), ReadParaFormatting);
+  FCtrlTable.AddCtrl('tqr', Integer(rppTabKindR), ReadParaFormatting);
+  FCtrlTable.AddCtrl('tqc', Integer(rppTabKindC), ReadParaFormatting);
+  FCtrlTable.AddCtrl('tqdec', Integer(rppTabKindDec), ReadParaFormatting);
+  FCtrlTable.AddCtrl('tx', Integer(rppTabPos), ReadParaFormatting);
   // picture group ctrls
   FCtrlTable.AddCtrl('pict', Integer(rpiPict), ReadPictureGroup);
   FCtrlTable.AddCtrl('jpegblip', Integer(rpiJpeg), ReadPictureGroup);
@@ -2382,6 +2386,8 @@ begin
 end;
 
 procedure TKMemoRTFReader.ReadParaFormatting(ACtrl: Integer; var AText: AnsiString; AParam: Integer);
+var
+  TabDef: PTabDef;
 begin
   case FActiveState.Group of
     rgNone, rgTextBox, rgFieldResult: case TKMemoRTFParaProp(ACtrl) of
@@ -2452,6 +2458,17 @@ begin
       rppListIndex: FActiveState.ParaStyle.NumberingList := FListTable.IDByIndex(AParam);
       rppListLevel: FActiveState.ParaStyle.NumberingListLevel := AParam;
       rppListStartAt: FActiveState.ParaStyle.NumberStartAt := AParam;
+      rppTabKindR:  FActiveState.ParaStyle.TabKind := rpkRight;
+      rppTabKindC:  FActiveState.ParaStyle.TabKind := rpkCenter;
+      rppTabKindDec:  FActiveState.ParaStyle.TabKind := rpkDecimal;
+      rppTabPos:
+        begin
+          GetMem(TabDef, SizeOf(TTabDef));
+          TabDef.TabKind := FActiveState.ParaStyle.TabKind;
+          TabDef.Position := AParam;
+          FActiveState.ParaStyle.AddTabPos(TabDef);
+          FActiveState.ParaStyle.TabKind := rpkLeft; // reset to default
+        end;
     end;
     rgListLevel: case TKMemoRTFParaProp(ACtrl) of
       rppIndentFirst: ReadListgroup(Integer(rplLevelFirstIndent), AText, AParam);
@@ -3593,6 +3610,8 @@ begin
 end;
 
 procedure TKMemoRTFWriter.WriteParaStyle(AParaStyle: TKMemoParaStyle);
+var
+  i: integer;
 begin
   WriteCtrl('pard'); // always store complete paragraph properties
   if AParaStyle.FirstIndent <> 0 then
@@ -3667,6 +3686,18 @@ begin
     WriteCtrlParam('ilvl', AParaStyle.NumberingListLevel);
   if AParaStyle.NumberStartAt > 0 then
     WriteCtrlParam('lsstartat', AParaStyle.NumberStartAt);
+
+  for i:= 0 to AParaStyle.TabPosCount - 1 do
+  begin
+    case TKMemoTabKind(AParaStyle.TabPosList[i].TabKind) of
+      //rpkLeft:    WriteCtrl('tql'); // default value
+      rpkRight:   WriteCtrl('tqr');
+      rpkCenter:  WriteCtrl('tqc');
+      rpkDecimal: WriteCtrl('tqdec');
+    end;
+    WriteCtrlParam('tx', AParaStyle.TabPosList[i].Position);
+  end;
+
 end;
 
 procedure TKMemoRTFWriter.WritePicture(AImage: TGraphic);
@@ -4112,5 +4143,4 @@ begin
 end;
 
 end.
-
 
