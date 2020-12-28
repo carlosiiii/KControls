@@ -3861,6 +3861,7 @@ end;
 procedure TKMemoParaStyle.Assign(ASource: TPersistent);
 var
   i, count: integer;
+  TabDef: PTabDef;
 begin
   inherited;
   if ASource is TKMemoParaStyle then
@@ -3878,9 +3879,14 @@ begin
     ClearTabPos;
     FTabPosList.Capacity := TKMemoParaStyle(ASource).GetTabPosCount;
     for i:= 0 to count - 1 do
-       AddTabPos(TKMemoParaStyle(ASource).TabPosList[i]);
-  end;
-end;
+       begin
+          GetMem(TabDef, SizeOf(TTabDef));
+          TabDef.TabKind := TKMemoParaStyle(ASource).TabPosList[i].TabKind;
+          TabDef.Position := TKMemoParaStyle(ASource).TabPosList[i].Position;
+          AddTabPos(TabDef);
+       end;
+    end;
+end;  
 
 procedure TKMemoParaStyle.SetFirstIndent(const Value: Integer);
 begin
